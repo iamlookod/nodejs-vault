@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-nodejs
+  labels:
+    app: vault-nodejs
+spec:
+  selector:
+    matchLabels:
+      app: vault-nodejs
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/agent-inject-status: 'update'
+        vault.hashicorp.com/role: 'app-env'
+        vault.hashicorp.com/agent-inject-secret-envvars: 'env/vault-nodejs'
+        vault.hashicorp.com/agent-inject-template-envvars: |
+          {{ with secret "env/vault-nodejs" -}}
+            {{ range $k, $v := .Data.data }}
+              export {{ $k }}="{{ $v }}"
+            {{ end }}
+          {{- end }}
+      labels:
+        app: vault-nodejs
+    spec:
+      serviceAccountName: app-env
+      containers:
+        - name: vault-nodejs
+          image: iamlookod/vault-nodejs:latest
+          args:
+            ['sh', '-c', 'source /vault/secrets/envvars && node app.js']
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
